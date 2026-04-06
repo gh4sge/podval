@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>地下室 / ПОДВАЛ — Contour Text Overlay</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0a; --surface: #111; --border: #222;
+    --text: #999; --dim: #555; --accent: #fff;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; font-size: 11px; }
+
+  .app { display: flex; height: 100vh; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 16px 14px; overflow-y: auto; width: 280px; flex-shrink: 0;
+  }
+  .logo { font-size: 14px; color: var(--accent); letter-spacing: 0.1em; }
+  .logo-sub { font-size: 9px; color: var(--dim); letter-spacing: 0.25em; margin-bottom: 16px; }
+  .stitle {
+    font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--dim); margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border);
+  }
+  .ctrl { margin-bottom: 8px; }
+  .ctrl label { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; }
+  .ctrl .v { color: var(--dim); font-variant-numeric: tabular-nums; }
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 2px;
+    background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+  }
+  select {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); padding: 5px; font-family: inherit; font-size: 10px; border-radius: 3px;
+  }
+  .btn {
+    width: 100%; padding: 9px; background: var(--accent); color: var(--bg);
+    border: none; font-family: inherit; font-size: 10px;
+    letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; border-radius: 3px; margin-bottom: 5px;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn.s { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn.s:hover { border-color: #444; color: var(--accent); }
+
+  .drop-zone {
+    border: 1px dashed var(--border); border-radius: 4px; padding: 18px 8px;
+    text-align: center; cursor: pointer; margin-bottom: 10px; color: var(--dim); font-size: 10px; line-height: 1.6;
+  }
+  .drop-zone:hover { border-color: #555; }
+  .drop-zone.has-image { border-style: solid; border-color: #333; padding: 4px; }
+  .drop-zone img { max-width: 100%; max-height: 80px; display: block; margin: 0 auto; }
+
+  .info { font-size: 8px; color: var(--dim); margin-top: 2px; }
+
+  /* Color swatches */
+  .color-row { display: flex; gap: 6px; margin-top: 4px; }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.15s;
+  }
+  .swatch:hover { border-color: #666; }
+  .swatch.active { border-color: var(--accent); }
+  .swatch-white { background: #fff; }
+  .swatch-black { background: #000; border: 2px solid #333; }
+  .swatch-black.active { border-color: #fff; }
+  .swatch-red { background: #ff3333; }
+  .swatch-green { background: #33ff66; }
+  .swatch-blue { background: #3388ff; }
+
+  /* ─── CANVAS AREA ─── */
+  .canvas-area {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 16px; overflow: hidden; position: relative;
+  }
+
+  .canvas-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  #cv {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .ph { color: var(--dim); font-size: 11px; text-align: center; line-height: 2; position: absolute; }
+  .ph .big { font-size: 28px; display: block; margin-bottom: 8px; color: #333; }
+
+  .stat {
+    position: fixed; bottom: 10px; right: 10px; background: var(--surface);
+    border: 1px solid var(--border); padding: 5px 10px; font-size: 10px;
+    color: var(--dim); border-radius: 4px; display: none; z-index: 10;
+  }
+  .stat.on { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="logo">地下室 подвал</div>
+    <div class="logo-sub">contour text overlay</div>
+
+    <div class="stitle">Image</div>
+    <div class="drop-zone" id="dz">Drop image here<br>or click to browse</div>
+    <input type="file" id="fi" accept="image/*" style="display:none">
+
+    <div class="stitle">Text Lines</div>
+    <div class="ctrl">
+      <label>Line spacing <span class="v" id="lsV">12</span></label>
+      <input type="range" id="ls" min="4" max="40" step="1" value="12">
+    </div>
+    <div class="ctrl">
+      <label>Font size <span class="v" id="fsV">9</span></label>
+      <input type="range" id="fs" min="4" max="32" step="1" value="9">
+    </div>
+    <div class="ctrl">
+      <label>Opacity <span class="v" id="opV">0.85</span></label>
+      <input type="range" id="op" min="0.05" max="1" step="0.01" value="0.85">
+    </div>
+
+    <div class="stitle">Text Color</div>
+    <div class="color-row">
+      <div class="swatch swatch-white active" data-color="#ffffff" title="White"></div>
+      <div class="swatch swatch-black" data-color="#000000" title="Black"></div>
+      <div class="swatch swatch-red" data-color="#ff3333" title="Red"></div>
+      <div class="swatch swatch-green" data-color="#33ff66" title="Green"></div>
+      <div class="swatch swatch-blue" data-color="#3388ff" title="Blue"></div>
+    </div>
+
+    <div class="stitle">Edge Detection</div>
+    <div class="ctrl">
+      <label>Edge sensitivity <span class="v" id="esV">0.12</span></label>
+      <input type="range" id="es" min="0.02" max="0.5" step="0.01" value="0.12">
+    </div>
+    <div class="ctrl">
+      <label>Edge zone radius <span class="v" id="erV">8</span></label>
+      <input type="range" id="er" min="1" max="30" step="1" value="8">
+      <div class="info">How far from edge symbols appear</div>
+    </div>
+
+    <div class="stitle">Coverage</div>
+    <div class="ctrl">
+      <label>Line coverage <span class="v" id="lcV">0.6</span></label>
+      <input type="range" id="lc" min="0.1" max="1" step="0.01" value="0.6">
+    </div>
+    <div class="ctrl">
+      <label>Gap randomness <span class="v" id="grV">0.4</span></label>
+      <input type="range" id="gr" min="0" max="1" step="0.01" value="0.4">
+    </div>
+    <div class="ctrl">
+      <label>Mode</label>
+      <select id="md">
+        <option value="edges" selected>Edges only</option>
+        <option value="edges+bright">Edges + bright areas</option>
+      </select>
+    </div>
+    <div class="ctrl">
+      <label>Brightness influence <span class="v" id="biV">0.3</span></label>
+      <input type="range" id="bi" min="0" max="1" step="0.01" value="0.3">
+    </div>
+
+    <div class="stitle">ПОДВАЛ Letters</div>
+    <div class="ctrl">
+      <label>Letter mix <span class="v" id="plV">0.08</span></label>
+      <input type="range" id="pl" min="0" max="0.5" step="0.01" value="0.08">
+    </div>
+    <div class="ctrl">
+      <label>Full word rarity <span class="v" id="fwV">0.004</span></label>
+      <input type="range" id="fw" min="0" max="0.03" step="0.001" value="0.004">
+    </div>
+
+    <div class="stitle">Actions</div>
+    <button class="btn" id="genBtn">Generate</button>
+    <button class="btn s" id="expBtn">Export PNG</button>
+  </div>
+
+  <div class="canvas-area">
+    <div class="canvas-container">
+      <div id="ph" class="ph"><span class="big">地下室</span>Load an image and press Generate</div>
+      <canvas id="cv" style="display:none"></canvas>
+    </div>
+  </div>
+</div>
+<div class="stat" id="st"></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const dz=$('dz'), fi=$('fi'), cv=$('cv'), ctx=cv.getContext('2d',{willReadFrequently:true});
+  const ph=$('ph'), st=$('st');
+  let img=null;
+  let textColor='#ffffff';
+
+  function status(m){st.textContent=m;st.classList.add('on');}
+  function noStatus(){st.classList.remove('on');}
+
+  // Sliders
+  [['ls','lsV'],['fs','fsV'],['op','opV'],['es','esV'],['er','erV'],
+   ['lc','lcV'],['gr','grV'],['bi','biV'],['pl','plV'],['fw','fwV']].forEach(([a,b])=>{
+    const e=$(a),v=$(b);
+    if(e&&v) e.addEventListener('input',()=>v.textContent=e.value);
+  });
+
+  // Color swatches
+  document.querySelectorAll('.swatch').forEach(sw=>{
+    sw.addEventListener('click',()=>{
+      document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+      sw.classList.add('active');
+      textColor=sw.dataset.color;
+    });
+  });
+
+  // Drop zone
+  dz.addEventListener('click',()=>fi.click());
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.style.borderColor='#555';});
+  dz.addEventListener('dragleave',()=>{dz.style.borderColor='';});
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.style.borderColor='';if(e.dataTransfer.files.length)load(e.dataTransfer.files[0]);});
+  fi.addEventListener('change',e=>{if(e.target.files.length)load(e.target.files[0]);});
+
+  function load(f){
+    const r=new FileReader();
+    r.onload=ev=>{
+      const i=new Image();
+      i.onload=()=>{
+        img=i;
+        dz.innerHTML='';dz.classList.add('has-image');
+        const p=document.createElement('img');p.src=ev.target.result;dz.appendChild(p);
+        status(i.naturalWidth+'×'+i.naturalHeight+' loaded');
+        setTimeout(noStatus,2000);
+      };
+      i.src=ev.target.result;
+    };
+    r.readAsDataURL(f);
+  }
+
+  // Sobel with dilated edge map
+  function computeEdgeMap(imageData,w,h,dilateR){
+    const d=imageData.data;
+    const gray=new Float32Array(w*h);
+    for(let i=0;i<w*h;i++){
+      const p=i*4;
+      gray[i]=(0.299*d[p]+0.587*d[p+1]+0.114*d[p+2])/255;
+    }
+    const rawEdges=new Float32Array(w*h);
+    for(let y=1;y<h-1;y++){
+      for(let x=1;x<w-1;x++){
+        const tl=gray[(y-1)*w+(x-1)],tc=gray[(y-1)*w+x],tr=gray[(y-1)*w+(x+1)];
+        const ml=gray[y*w+(x-1)],mr=gray[y*w+(x+1)];
+        const bl=gray[(y+1)*w+(x-1)],bc=gray[(y+1)*w+x],br=gray[(y+1)*w+(x+1)];
+        const gx=-tl+tr-2*ml+2*mr-bl+br;
+        const gy=-tl-2*tc-tr+bl+2*bc+br;
+        rawEdges[y*w+x]=Math.sqrt(gx*gx+gy*gy);
+      }
+    }
+    let mx=0;
+    for(let i=0;i<rawEdges.length;i++) if(rawEdges[i]>mx) mx=rawEdges[i];
+    if(mx>0) for(let i=0;i<rawEdges.length;i++) rawEdges[i]/=mx;
+
+    // Dilate with stepped sampling for speed
+    const stepD=Math.max(1,Math.floor(dilateR/3));
+    const temp=new Float32Array(w*h);
+    const dilated=new Float32Array(w*h);
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        let m=0;
+        for(let dx=-dilateR;dx<=dilateR;dx+=stepD){
+          const xx=x+dx; if(xx>=0&&xx<w){const v=rawEdges[y*w+xx];if(v>m)m=v;}
+        }
+        temp[y*w+x]=m;
+      }
+    }
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        let m=0;
+        for(let dy=-dilateR;dy<=dilateR;dy+=stepD){
+          const yy=y+dy; if(yy>=0&&yy<h){const v=temp[yy*w+x];if(v>m)m=v;}
+        }
+        dilated[y*w+x]=m;
+      }
+    }
+    return {edges:rawEdges, dilated, gray};
+  }
+
+  // Fit canvas display to viewport
+  function fitCanvas(){
+    if(!cv.width) return;
+    const area = document.querySelector('.canvas-area');
+    const aw = area.clientWidth - 32;
+    const ah = area.clientHeight - 32;
+    const cw = cv.width;
+    const ch = cv.height;
+    const scale = Math.min(aw/cw, ah/ch, 1);
+    cv.style.width = Math.floor(cw*scale)+'px';
+    cv.style.height = Math.floor(ch*scale)+'px';
+  }
+  window.addEventListener('resize', fitCanvas);
+
+  // Generate
+  $('genBtn').addEventListener('click', generate);
+
+  function generate(){
+    if(!img){status('No image');setTimeout(noStatus,2000);return;}
+
+    const refWidth=800;
+    const scale=Math.max(img.naturalWidth,img.naturalHeight)/refWidth;
+    const autoScale=Math.max(1,scale);
+
+    const P={
+      lineSpacing: Math.round(parseInt($('ls').value)*autoScale),
+      fontSize:    Math.round(parseInt($('fs').value)*autoScale),
+      opacity:     parseFloat($('op').value),
+      edgeSens:    parseFloat($('es').value),
+      edgeRadius:  Math.round(parseInt($('er').value)*autoScale),
+      lineCoverage:parseFloat($('lc').value),
+      gapRandom:   parseFloat($('gr').value),
+      mode:        $('md').value,
+      bright:      parseFloat($('bi').value),
+      podval:      parseFloat($('pl').value),
+      fullWord:    parseFloat($('fw').value),
+      color:       textColor,
+    };
+
+    cv.width=img.naturalWidth;
+    cv.height=img.naturalHeight;
+    ctx.drawImage(img,0,0);
+    ph.style.display='none';
+    cv.style.display='block';
+    fitCanvas();
+
+    status(`Computing edges (${autoScale.toFixed(1)}x, font ${P.fontSize}px)...`);
+
+    const imageData=ctx.getImageData(0,0,cv.width,cv.height);
+
+    setTimeout(()=>{
+      const {edges,dilated,gray}=computeEdgeMap(imageData,cv.width,cv.height,P.edgeRadius);
+      status('Rendering text lines...');
+
+      setTimeout(()=>{
+        ctx.drawImage(img,0,0);
+
+        const w=cv.width, h=cv.height;
+        const charW=P.fontSize*0.6;
+        const baseChars='0011001100..:';
+        const podvalChars='подвал';
+        const podvalWord='подвал';
+
+        ctx.font=`${P.fontSize}px "Courier New", monospace`;
+        ctx.textBaseline='top';
+        ctx.textAlign='left';
+        ctx.fillStyle=P.color;
+
+        let totalChars=0;
+
+        const rows=[];
+        for(let y=P.lineSpacing;y<h-P.lineSpacing;y+=P.lineSpacing) rows.push(y);
+
+        const activeRows=rows.filter((y,i)=>{
+          const noise=Math.sin(y*0.0073+i*0.31)*0.5+0.5;
+          return noise<P.lineCoverage;
+        });
+
+        let ri=0;
+        const CHUNK=20;
+
+        function renderChunk(){
+          const end=Math.min(ri+CHUNK,activeRows.length);
+
+          for(;ri<end;ri++){
+            const y=activeRows[ri];
+            let x=Math.random()*charW*3;
+            let inRun=false, runLen=0;
+
+            while(x<w){
+              const ix=Math.floor(x), iy=Math.floor(y);
+              if(ix<0||ix>=w||iy<0||iy>=h){x+=charW;continue;}
+
+              const idx=iy*w+ix;
+              const edgeVal=dilated[idx];
+              const bright=gray[idx];
+
+              let shouldPrint=false;
+              if(edgeVal>P.edgeSens) shouldPrint=true;
+
+              if(P.mode==='edges+bright'&&!shouldPrint){
+                if(bright>0.6){
+                  const bProb=(bright-0.6)/0.4*P.bright*0.4;
+                  if(Math.random()<bProb) shouldPrint=true;
+                }
+              }
+
+              if(shouldPrint){
+                if(inRun&&Math.random()<P.gapRandom*0.15){
+                  x+=charW*(1+Math.floor(Math.random()*3));
+                  continue;
+                }
+
+                let ch;
+                const roll=Math.random();
+                if(roll<P.fullWord&&runLen>3){
+                  ch=podvalWord;
+                } else if(roll<P.fullWord+P.podval){
+                  ch=podvalChars[Math.floor(Math.random()*podvalChars.length)];
+                } else {
+                  ch=baseChars[Math.floor(Math.random()*baseChars.length)];
+                }
+
+                // At opacity=1 → always fully opaque. Below 1 → edge strength modulates.
+                const alpha = P.opacity >= 0.99 ? 1.0 : P.opacity * (0.5 + Math.min(edgeVal,1) * 0.5);
+                ctx.globalAlpha = Math.min(alpha, 1);
+
+                if(ch===podvalWord){
+                  ctx.fillText(ch,x,y);
+                  x+=charW*ch.length;
+                  totalChars+=ch.length;
+                } else {
+                  ctx.fillText(ch,x,y);
+                  x+=charW;
+                  totalChars++;
+                }
+                inRun=true; runLen++;
+              } else {
+                inRun=false; runLen=0;
+                x+=charW;
+                if(edgeVal<P.edgeSens*0.3) x+=charW*2;
+              }
+            }
+          }
+
+          if(ri<activeRows.length){
+            status(`Rendering... ${Math.round(ri/activeRows.length*100)}%`);
+            requestAnimationFrame(renderChunk);
+          } else {
+            ctx.globalAlpha=1;
+            status(`Done — ${totalChars} chars, ${activeRows.length} lines`);
+            setTimeout(noStatus,4000);
+          }
+        }
+        requestAnimationFrame(renderChunk);
+      },30);
+    },50);
+  }
+
+  // Export
+  $('expBtn').addEventListener('click',()=>{
+    if(!cv.width)return;
+    const a=document.createElement('a');
+    a.download='podval_overlay.png';
+    a.href=cv.toDataURL('image/png');
+    a.click();
+  });
+})();
+</script>
+</body>
+</html>
